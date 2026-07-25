@@ -9,15 +9,8 @@ import type { HandoverValidationIssue, HandoverValidationResult } from './types'
  */
 const EXCLUDED_CLINICAL_LANGUAGE = /\b(?:diagnos(?:e|ed|is|ing)|triag(?:e|ed|ing)|treat(?:ment|ed|ing)?|medicat(?:e|ed|ion|ions)|prescrib(?:e|ed|ing)|recommend(?:ation|ed|ing|s)?|advis(?:e|ed|ing)|should|must|urgent(?:ly)?|emergency)\b/i;
 
-/* Any negative or uncertain knowledge belongs under unresolved in P0. */
-const UNCERTAIN_OR_NEGATIVE_LANGUAGE = /\b(?:not|no|none|never|without|unable|unknown|unclear|unconfirmed|could not|cannot|can not|pending|awaiting|absence|missing|unrecorded|unavailable)\b/i;
-
 export function containsExcludedClinicalLanguage(text: string): boolean {
   return EXCLUDED_CLINICAL_LANGUAGE.test(text);
-}
-
-export function containsUncertainOrNegativeLanguage(text: string): boolean {
-  return UNCERTAIN_OR_NEGATIVE_LANGUAGE.test(text);
 }
 
 export function isSourceCited(statement: SourcedStatement, eventIds: ReadonlySet<CareEvent['id']>): boolean {
@@ -28,10 +21,10 @@ export function isSourceCited(statement: SourcedStatement, eventIds: ReadonlySet
 export function validateGeneratedHandover(handover: Handover, events: readonly CareEvent[]): HandoverValidationResult {
   const issues: HandoverValidationIssue[] = [];
   const eventIds = new Set(events.map((event) => event.id));
-  const statements: Array<{ path: string; statement: SourcedStatement; kind: 'summary' | 'claim' | 'unresolved' }> = [
-    { path: 'summary', statement: handover.summary, kind: 'summary' },
-    ...handover.claims.map((statement, index) => ({ path: `claims[${index}]`, statement, kind: 'claim' as const })),
-    ...handover.unresolved.map((statement, index) => ({ path: `unresolved[${index}]`, statement, kind: 'unresolved' as const })),
+  const statements: Array<{ path: string; statement: SourcedStatement }> = [
+    { path: 'summary', statement: handover.summary },
+    ...handover.claims.map((statement, index) => ({ path: `claims[${index}]`, statement })),
+    ...handover.unresolved.map((statement, index) => ({ path: `unresolved[${index}]`, statement })),
   ];
 
   if (eventIds.size === 0) issues.push({ path: 'events', message: 'At least one source event is required.' });
@@ -42,15 +35,12 @@ export function validateGeneratedHandover(handover: Handover, events: readonly C
     issues.push({ path: 'sourceEventIds', message: 'Handover includes an unknown source event ID.' });
   }
 
-  for (const { path, statement, kind } of statements) {
+  for (const { path, statement } of statements) {
     if (!isSourceCited(statement, eventIds)) {
       issues.push({ path, message: 'Every generated statement must cite one or more supplied source event IDs.' });
     }
     if (containsExcludedClinicalLanguage(statement.text)) {
       issues.push({ path, message: 'Generated text contains excluded diagnosis, triage, or treatment language.' });
-    }
-    if (kind === 'claim' && containsUncertainOrNegativeLanguage(statement.text)) {
-      issues.push({ path, message: 'Uncertain or negative knowledge must be placed under unresolved.' });
     }
   }
 

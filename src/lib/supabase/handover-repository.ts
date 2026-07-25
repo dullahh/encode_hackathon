@@ -6,6 +6,7 @@ import type {
   ShareConfirmation,
   SourcedStatement,
 } from '@/types/care';
+import { generateDeterministicHandover } from '@/features/ai';
 
 import { createSupabaseServerClient, type SupabaseServerClient } from './server-client';
 
@@ -24,6 +25,9 @@ type CareEventRow = {
   category: CareEvent['category'];
   author_label: string;
   narrative: string;
+  contributor_role?: CareEvent['contributorRole'];
+  provenance?: CareEvent['provenance'];
+  review_status?: CareEvent['reviewStatus'];
 };
 
 type HandoverRow = {
@@ -55,6 +59,7 @@ export interface HandoverRepository {
   getBundle(handoverId: string): Promise<HandoverBundle | undefined>;
   saveBundle(bundle: HandoverBundle): Promise<void>;
   confirmAndShare(confirmation: ShareConfirmation): Promise<Handover | undefined>;
+  appendReviewedEvent(handoverId: string, event: CareEvent): Promise<HandoverBundle | undefined>;
 }
 
 /**
@@ -137,6 +142,27 @@ class RestHandoverRepository implements HandoverRepository {
     return handoverFromRows(shared, claims);
   }
 
+  async appendReviewedEvent(handoverId: string, event: CareEvent): Promise<HandoverBundle | undefined> {
+    const existing = await this.getBundle(handoverId);
+    if (!existing || existing.handover.status === 'shared' || existing.patient.id !== event.patientId || existing.events.some((item) => item.id === event.id)) return undefined;
+    await this.client.request('care_events', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        id: event.id, patient_id: event.patientId, occurred_at: event.occurredAt, category: event.category, author_label: event.authorLabel, narrative: event.narrative,
+        contributor_role: event.contributorRole, provenance: event.provenance, review_status: event.reviewStatus,
+      }),
+    });
+    const nextEvents = [...existing.events, event];
+    const nextBundle: HandoverBundle = {
+      patient: existing.patient,
+      events: nextEvents,
+      handover: generateDeterministicHandover({ id: existing.handover.id, patientId: existing.patient.id, events: nextEvents, generatedAt: event.occurredAt, status: 'ready_to_share' }),
+    };
+    await this.saveBundle(nextBundle);
+    return nextBundle;
+  }
+
   private async first<T>(path: string): Promise<T | undefined> {
     const rows = await this.client.request<T[]>(path);
     return rows[0];
@@ -175,10 +201,21 @@ function patientToRow(patient: Patient): PatientRow {
 }
 
 function eventFromRow(row: CareEventRow): CareEvent {
-  return { id: row.id, patientId: row.patient_id, occurredAt: row.occurred_at, category: row.category, authorLabel: row.author_label, narrative: row.narrative };
+  const inferredRole: CareEvent['contributorRole'] = row.author_label.toLowerCase().includes('daniel') ? 'family_informal_caregiver' : 'professional_caregiver';
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    occurredAt: row.occurred_at,
+    category: row.category,
+    authorLabel: row.author_label,
+    narrative: row.narrative,
+    contributorRole: row.contributor_role ?? inferredRole,
+    provenance: row.provenance ?? 'typed',
+    reviewStatus: row.review_status ?? 'reviewed_observation',
+  };
 }
 
-function eventToRow(event: CareEvent): CareEventRow {
+function eventToRow(event: CareEvent): Omit<CareEventRow, 'contributor_role' | 'provenance' | 'review_status'> {
   return { id: event.id, patient_id: event.patientId, occurred_at: event.occurredAt, category: event.category, author_label: event.authorLabel, narrative: event.narrative };
 }
 

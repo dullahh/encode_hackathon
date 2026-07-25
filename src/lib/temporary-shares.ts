@@ -3,7 +3,7 @@ import 'server-only';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import QRCode from 'qrcode';
 
-import { cannedDemoBundle } from '@/lib/demo-data';
+import { cannedDemoBundle, cannedDraftBundle, DEMO_DRAFT_HANDOVER_ID } from '@/lib/demo-data';
 import { createHandoverRepository } from '@/lib/supabase/handover-repository';
 import { createSupabaseServerClient, type SupabaseServerClient } from '@/lib/supabase/server-client';
 import type { HandoverBundle, ShareConfirmation } from '@/types/care';
@@ -21,9 +21,10 @@ type RemoteShareRow = {
   expired_audited_at: string | null;
 };
 
-type LocalShareRow = RemoteShareRow & { tokenHash: string; audit: ShareEventType[] };
+type LocalShareRow = RemoteShareRow & { tokenHash: string; audit: ShareEventType[]; bundle: HandoverBundle };
 
 const localDemoShares = new Map<string, LocalShareRow>();
+const locallyConfirmedDraftHandoverIds = new Set<string>();
 
 export class TemporaryShareError extends Error {
   constructor(message: string, readonly status: 400 | 403 | 404 | 503 = 400) {
@@ -35,6 +36,11 @@ export class TemporaryShareError extends Error {
 export interface TemporaryShareResolution {
   state: TemporaryShareState;
   bundle?: HandoverBundle;
+}
+
+/** Local-only confirmation marker for the explicitly started canned draft. */
+export function confirmLocalDemoDraft(handoverId: string): void {
+  if (handoverId === DEMO_DRAFT_HANDOVER_ID) locallyConfirmedDraftHandoverIds.add(handoverId);
 }
 
 function hashToken(token: string): string {
@@ -96,7 +102,8 @@ async function createRemoteShare(client: SupabaseServerClient, handoverId: strin
 }
 
 async function createLocalDemoShare(handoverId: string, accessOrigin: string): Promise<TemporaryShare> {
-  if (handoverId !== cannedDemoBundle.handover.id || cannedDemoBundle.handover.status !== 'ready_to_share') {
+  const bundle = handoverId === cannedDemoBundle.handover.id ? cannedDemoBundle : handoverId === DEMO_DRAFT_HANDOVER_ID ? cannedDraftBundle : undefined;
+  if (!bundle || (handoverId === DEMO_DRAFT_HANDOVER_ID && !locallyConfirmedDraftHandoverIds.has(handoverId))) {
     throw new TemporaryShareError('The local demo can only share the fixed synthetic handover after confirmation.', 403);
   }
 
@@ -104,7 +111,7 @@ async function createLocalDemoShare(handoverId: string, accessOrigin: string): P
   const id = randomUUID();
   const expiresAt = expiration();
   const accessUrl = new URL(`/share/${token}`, accessOrigin).toString();
-  localDemoShares.set(hashToken(token), { id, handover_id: handoverId, expires_at: expiresAt, revoked_at: null, expired_audited_at: null, tokenHash: hashToken(token), audit: ['created'] });
+  localDemoShares.set(hashToken(token), { id, handover_id: handoverId, expires_at: expiresAt, revoked_at: null, expired_audited_at: null, tokenHash: hashToken(token), audit: ['created'], bundle: { ...bundle, handover: { ...bundle.handover, status: 'shared' } } });
   return { id, accessUrl, expiresAt, qrCodeDataUrl: await qrCode(accessUrl), delivery: 'local_demo' };
 }
 
@@ -114,7 +121,7 @@ export async function createTemporaryShare(handoverId: string, accessOrigin: str
     throw new TemporaryShareError('Carer confirmation is required before creating a temporary share.', 403);
   }
   const client = createSupabaseServerClient();
-  return client ? createRemoteShare(client, handoverId, accessOrigin) : createLocalDemoShare(handoverId, accessOrigin);
+  return handoverId === DEMO_DRAFT_HANDOVER_ID ? createLocalDemoShare(handoverId, accessOrigin) : client ? createRemoteShare(client, handoverId, accessOrigin) : createLocalDemoShare(handoverId, accessOrigin);
 }
 
 async function resolveRemoteShare(client: SupabaseServerClient, token: string): Promise<TemporaryShareResolution> {
@@ -146,12 +153,13 @@ function resolveLocalDemoShare(token: string): TemporaryShareResolution {
     return { state: 'expired' };
   }
   share.audit.push('opened');
-  return { state: 'valid', bundle: cannedDemoBundle };
+  return { state: 'valid', bundle: share.bundle };
 }
 
 /** Resolves a raw token server-side only; raw tokens are never stored remotely. */
 export async function resolveTemporaryShare(token: string): Promise<TemporaryShareResolution> {
   if (!token || token.length < 20) return { state: 'invalid' };
+  if (localDemoShares.has(hashToken(token))) return resolveLocalDemoShare(token);
   const client = createSupabaseServerClient();
   try {
     return client ? await resolveRemoteShare(client, token) : resolveLocalDemoShare(token);
@@ -163,6 +171,11 @@ export async function resolveTemporaryShare(token: string): Promise<TemporarySha
 export async function revokeTemporaryShare(shareId: string, handoverId: string, confirmation: ShareConfirmation): Promise<TemporaryShareState> {
   if (confirmation.handoverId !== handoverId || !confirmation.confirmedBy.trim() || !confirmation.confirmedAt || !confirmation.attestation.trim()) {
     throw new TemporaryShareError('Carer confirmation is required before revoking a temporary share.', 403);
+  }
+  const localShare = [...localDemoShares.values()].find((item) => item.id === shareId && item.handover_id === handoverId);
+  if (localShare) {
+    if (!localShare.revoked_at) { localShare.revoked_at = new Date().toISOString(); localShare.audit.push('revoked'); }
+    return 'revoked';
   }
   const client = createSupabaseServerClient();
   if (!client) {

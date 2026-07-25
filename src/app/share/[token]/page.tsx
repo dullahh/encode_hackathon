@@ -1,4 +1,5 @@
 import { HandoverScreen } from '@/components/handover-screen';
+import { presentHandover } from '@/features/ai/present-handover';
 import { resolveTemporaryShare } from '@/lib/temporary-shares';
 
 export const dynamic = 'force-dynamic';
@@ -9,5 +10,5 @@ export default async function TemporarySharePage({ params }: { params: Promise<{
   if (result.state !== 'valid' || !result.bundle) {
     return <main className="share-state"><h1>Temporary handover unavailable</h1><p>This temporary handover link is invalid, expired, or no longer active.</p></main>;
   }
-  return <HandoverScreen bundle={result.bundle} readOnly />;
+  return <HandoverScreen bundle={await presentHandover(result.bundle)} readOnly />;
 }

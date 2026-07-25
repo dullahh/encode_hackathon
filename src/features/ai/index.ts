@@ -2,7 +2,6 @@ export { classifyCareEvent, generateDeterministicHandover } from './generate-han
 export {
   assertValidGeneratedHandover,
   containsExcludedClinicalLanguage,
-  containsUncertainOrNegativeLanguage,
   isSourceCited,
   validateGeneratedHandover,
 } from './safety';

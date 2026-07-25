@@ -1,4 +1,4 @@
-import type { CareEvent, Handover, HandoverStatus, SourcedStatement } from '@/types/care';
+import type { CareEvent, Handover, HandoverSection, HandoverStatus, SourcedStatement } from '@/types/care';
 
 /** Input for the deterministic P0 handover generator. It deliberately has no model or API settings. */
 export interface GenerateHandoverInput {
@@ -23,7 +23,23 @@ export interface HandoverValidationResult {
 export interface ClassifiedEvent {
   event: CareEvent;
   destination: 'claim' | 'unresolved';
-  reason?: 'uncertain_or_negative' | 'excluded_language' | 'missing_narrative';
+  reason?: 'uncertain_or_negative' | 'excluded_language' | 'missing_narrative' | 'needs_clarification';
+}
+
+/** Strict provider payload: it selects evidence and a neutral display section only. */
+export interface StructuredClaimSelection {
+  section: HandoverSection;
+  sourceEventIds: CareEvent['id'][];
+}
+
+export interface StructuredUnresolvedSelection {
+  reason: 'uncertain_or_incomplete' | 'conflicting_information' | 'restricted_source_language';
+  sourceEventIds: CareEvent['id'][];
+}
+
+export interface StructuredHandoverOutput {
+  claims: StructuredClaimSelection[];
+  unresolved: StructuredUnresolvedSelection[];
 }
 
 export type { SourcedStatement };

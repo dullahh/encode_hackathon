@@ -1,6 +1,6 @@
 import type { CareEvent, Handover, SourcedStatement } from '@/types/care';
 
-import { assertValidGeneratedHandover, containsExcludedClinicalLanguage, containsUncertainOrNegativeLanguage } from './safety';
+import { assertValidGeneratedHandover, containsExcludedClinicalLanguage } from './safety';
 import type { ClassifiedEvent, GenerateHandoverInput } from './types';
 
 function orderEvents(events: readonly CareEvent[]): CareEvent[] {
@@ -27,12 +27,12 @@ function asCanonicalTimestamp(timestamp: string): string {
   return parsed.toISOString();
 }
 
-/** Separates source-recorded facts from missing, negative, or uncertain information without inference. */
+/** Human review status governs uncertainty; ordinary negative wording remains eligible source evidence. */
 export function classifyCareEvent(event: CareEvent): ClassifiedEvent {
   const narrative = event.narrative.trim();
   if (!narrative) return { event, destination: 'unresolved', reason: 'missing_narrative' };
+  if (event.reviewStatus === 'needs_clarification') return { event, destination: 'unresolved', reason: 'needs_clarification' };
   if (containsExcludedClinicalLanguage(narrative)) return { event, destination: 'unresolved', reason: 'excluded_language' };
-  if (containsUncertainOrNegativeLanguage(narrative)) return { event, destination: 'unresolved', reason: 'uncertain_or_negative' };
   return { event, destination: 'claim' };
 }
 
@@ -43,6 +43,8 @@ function unresolvedText(classification: ClassifiedEvent): string {
       return `The ${classification.event.category.replace('_', ' ')} item dated ${date} has no recorded narrative.`;
     case 'excluded_language':
       return `The ${classification.event.category.replace('_', ' ')} item dated ${date} needs source-record review before it can appear in this P0 handover.`;
+    case 'needs_clarification':
+      return `Needs clarification from the ${classification.event.provenance} report dated ${date}: ${classification.event.narrative.trim()}`;
     default:
       return `Unresolved source note dated ${date}: ${classification.event.narrative.trim()}`;
   }
