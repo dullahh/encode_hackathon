@@ -1,14 +1,37 @@
 # CareRelay
 
+## [Live demo](https://encode-hackathon-px34el5yp-dullahhs-projects.vercel.app/) · [Video demo](https://youtu.be/iDLEOHiirII)
+
+CareRelay turns fragmented carer observations into an evidence-linked clinician
+handover that must be explicitly confirmed before it can be shared through an
+expiring, revocable, read-only QR route.
+
+> **Prototype boundary:** CareRelay uses synthetic patient data only. It does
+> not provide diagnosis, triage, or treatment recommendations.
+
+## Demo flow
+
+1. Record Aisha's observation.
+2. Generate the structured, source-linked handover.
+3. Review and explicitly confirm it.
+4. Create the temporary QR share.
+5. Open the mobile-friendly, read-only clinician view.
+
+## Deployment
+
+The application is deployed on Vercel. When configured, Supabase provides
+persistent storage for temporary shares. If an OpenAI request is unavailable,
+CareRelay uses its deterministic evidence-led fallback.
+
+## Technology
+
+Next.js, React, TypeScript, and `qrcode`.
+
 **Source-grounded clinical handovers that move safely with the patient.**
 
-CareRelay turns fragmented care-event data into a concise, traceable clinician
-handover. Every generated claim links to the source event that supports it,
-uncertainty is shown rather than guessed, and confirmed handovers can be shared
-through an expiring, revocable, read-only QR code.
-
-> **Hackathon prototype:** CareRelay uses fixed, synthetic patient data only.
-> It does not provide diagnosis, triage, or treatment recommendations.
+Every generated claim links to the source event that supports it, uncertainty is
+shown rather than guessed, and confirmed handovers can be shared through an
+expiring, revocable, read-only QR code.
 
 ## Why CareRelay
 
@@ -103,6 +126,17 @@ npm run dev
 ```
 
 Then open [http://localhost:3000](http://localhost:3000).
+
+### Environment-variable names
+
+The local demo works without configuration. Configure only the applicable
+names below; do not add values to this README.
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY`
+- `CARE_RELAY_PUBLIC_ORIGIN`
+- `VERCEL_URL` (provided by Vercel for deployed environments)
 
 Optional checks:
 
