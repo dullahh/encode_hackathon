@@ -215,8 +215,19 @@ function eventFromRow(row: CareEventRow): CareEvent {
   };
 }
 
-function eventToRow(event: CareEvent): Omit<CareEventRow, 'contributor_role' | 'provenance' | 'review_status'> {
-  return { id: event.id, patient_id: event.patientId, occurred_at: event.occurredAt, category: event.category, author_label: event.authorLabel, narrative: event.narrative };
+/** Maps every required domain field to the additive care_events persistence schema. */
+export function eventToRow(event: CareEvent): CareEventRow {
+  return {
+    id: event.id,
+    patient_id: event.patientId,
+    occurred_at: event.occurredAt,
+    category: event.category,
+    author_label: event.authorLabel,
+    narrative: event.narrative,
+    contributor_role: event.contributorRole,
+    provenance: event.provenance,
+    review_status: event.reviewStatus,
+  };
 }
 
 function handoverFromRows(row: HandoverRow, statements: HandoverClaimRow[]): Handover {

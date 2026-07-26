@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:structured": "node --experimental-transform-types --experimental-loader ./tests/alias-loader.mjs --test tests/structured-handover.test.ts"
+    "test:structured": "node --experimental-transform-types --experimental-loader ./tests/alias-loader.mjs --test tests/structured-handover.test.ts",
+    "test:supabase-mapping": "node --experimental-transform-types --experimental-loader ./tests/alias-loader.mjs --test tests/supabase-row-mapping.test.ts"
   },
   "dependencies": {
     "@types/qrcode": "^1.5.6",
