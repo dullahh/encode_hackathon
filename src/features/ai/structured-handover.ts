@@ -29,6 +29,9 @@ function sectionForEvent(event: CareEvent): HandoverSection {
 }
 
 function fallback(input: GenerateHandoverInput, warning: string, fallbackCategory: HandoverFallbackCategory, providerStatus?: number): StructuredHandoverResult {
+  // Keep provider diagnostics out of the care-facing UI. This contains no source
+  // content or credentials, and lets operators investigate a degraded integration.
+  console.warn('CareRelay handover generation used the deterministic fallback.', { fallbackCategory, providerStatus });
   const handover = generateDeterministicHandover(input);
   const eventById = new Map(input.events.map((event) => [event.id, event]));
   return {

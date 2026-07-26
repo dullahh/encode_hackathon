@@ -2,60 +2,113 @@
 
 **Source-grounded clinical handovers that move safely with the patient.**
 
-CareRelay turns fragmented care-event data into a concise, traceable clinician handover. Every generated claim links back to its source event, uncertainty is surfaced rather than guessed, and confirmed handovers can be shared through an expiring, revocable, read-only QR code.
+CareRelay turns fragmented care-event data into a concise, traceable clinician
+handover. Every generated claim links to the source event that supports it,
+uncertainty is shown rather than guessed, and confirmed handovers can be shared
+through an expiring, revocable, read-only QR code.
 
-> **Hackathon prototype:** CareRelay uses fixed synthetic patient data only. It does not provide diagnosis, triage, or treatment recommendations.
+> **Hackathon prototype:** CareRelay uses fixed, synthetic patient data only.
+> It does not provide diagnosis, triage, or treatment recommendations.
 
-## The problem
+## Why CareRelay
 
-Critical patient context is often scattered across systems, organisations, and care settings. Clinicians can lose time reconstructing what happened, while incomplete or ambiguous handovers increase the risk of duplicated work and missed information.
+Critical context is often scattered across care settings, organisations, and
+systems. Reconstructing what happened takes time; presenting incomplete or
+ambiguous information as fact can cause harm.
 
-CareRelay demonstrates a safer way to centralise and transfer that context without pretending AI knows more than the underlying record.
+CareRelay demonstrates a safer handover model: keep every statement within the
+boundary of the record, make uncertainty visible, and require an intentional
+human decision before information leaves the care team.
 
-## What it demonstrates
+## The demo, end to end
 
-- Structured handovers generated from fragmented care events
-- Claim-level traceability through `sourceEventIds`
-- Explicit `unresolved` items when the evidence is incomplete
-- Mandatory carer confirmation before sharing
-- Temporary, expiring, and revocable QR handovers
-- Mobile-friendly, read-only access for the receiving clinician
-- Persistence across refreshes without exposing raw access tokens
-- A fixed synthetic patient journey for safe demonstration
+### 1. Start with the evidence
 
-## Demo journey
+The Maya demonstration handover separates source-recorded updates from open
+questions. Selecting **View source details** lets a recipient inspect the event
+behind a statement rather than treating the summary as a new source of truth.
 
-1. Review the synthetic patient’s distributed care history.
-2. Generate a structured, source-grounded handover.
-3. Inspect unresolved information and supporting events.
-4. Confirm the handover as the responsible carer.
-5. Create a temporary QR share.
-6. Open the read-only handover on another device.
-7. Revoke access when the transfer is complete.
+![Traceable handover with source-recorded updates](docs/images/initial_page_with_reports.png)
 
-## Safety by design
+### 2. Capture a contribution, then review it
 
-CareRelay is designed around evidence boundaries:
+The separate Aisha draft demonstrates that voice capture is consent-gated.
+Recording starts only after a deliberate user action and the browser's
+microphone-permission prompt. A transcript remains an editable draft: it must
+be reviewed before it can become a source event or be marked as needing
+clarification.
 
-- Generated statements must reference recorded source events.
-- Unsupported facts must not be presented as established truth.
-- Ambiguity is displayed explicitly under `unresolved`.
-- Sharing requires deliberate human confirmation.
-- Only a cryptographic token hash is persisted—not the raw share token.
-- No real patient data is included in this repository.
+![Browser microphone permission shown before voice capture can begin](docs/images/gif_upload_request.gif)
+
+### 3. Confirm and create a temporary QR share
+
+Sharing is not automatic. After confirmation, CareRelay creates an opaque,
+time-limited QR link that can be revoked when the transfer is complete.
+
+![Confirmed handover with a temporary QR share, expiry time, and revoke control](docs/images/generated_QR_code.png)
+
+### 4. Give the receiver a focused, read-only handover
+
+The recipient view is mobile-friendly and cannot be edited. It carries the
+same source-grounded updates and explicit unresolved information without
+exposing the wider editing workflow.
+
+![Mobile read-only temporary handover for Maya Patel](docs/images/temp_handover_view_only_page.png)
+
+## Safety model
+
+- **Evidence before assertion:** generated claims must reference recorded
+  `sourceEventIds`.
+- **Uncertainty stays visible:** incomplete evidence appears under
+  `unresolved`; it is not promoted to an established fact.
+- **Voice is not a shortcut to truth:** an incoming transcript requires review
+  before it affects a handover.
+- **Human confirmation gates sharing:** a handover must be explicitly
+  confirmed before a temporary share can be created.
+- **Temporary access is controllable:** QR handovers are read-only, expire, and
+  can be revoked.
+- **Tokens are handled defensively:** persistence stores only a cryptographic
+  hash of a share token, never its raw value.
+- **The repository contains no real patient data.**
 
 The frozen prototype contract is documented in
-[`docs/p0-contract.md`](docs/p0-contract.md), with canonical TypeScript
+[`docs/p0-contract.md`](docs/p0-contract.md), with the canonical TypeScript
 interfaces in [`src/types/care.ts`](src/types/care.ts).
 
-## Physical QR checkpoint
+## What the prototype demonstrates
 
-The complete sharing flow was tested across two physical devices on the same
-network. A phone scanned an expiring QR code and successfully opened the
-mobile-friendly handover for the fixed synthetic Maya case.
+- Structured handovers built from fragmented care events
+- Claim-level traceability and source-event inspection
+- Reviewed typed and voice contributions, with provenance retained
+- Explicit unresolved questions when the record is incomplete
+- Confirmation-gated, expiring, revocable QR sharing
+- A mobile-friendly, read-only recipient experience
+- A reliable local demo using two fixed synthetic journeys: Maya's established
+  handover and Aisha's draft contribution flow
+
+## Validation
+
+The complete QR flow was tested across two physical devices on the same
+network: a phone scanned an expiring code and opened the mobile-friendly,
+read-only Maya handover.
 
 ## Run locally
+
+The primary demo uses a deterministic local fallback, so no API keys or remote
+services are required.
 
 ```bash
 npm install
 npm run dev
+```
+
+Then open [http://localhost:3000](http://localhost:3000).
+
+Optional checks:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test:structured
+npm run test:supabase-mapping
+```
